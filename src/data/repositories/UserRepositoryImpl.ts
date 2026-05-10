@@ -19,4 +19,18 @@ export class UserRepositoryImpl implements UserRepository {
     const dto = await this.remoteDataSource.findById(id);
     return UserMapper.toDomain(dto);
   }
+
+  async create(user: Omit<User, 'id'>): Promise<User> {
+    const dto = await this.remoteDataSource.create(user);
+    return UserMapper.toDomain(dto);
+  }
+
+  async update(id: string, user: Partial<Omit<User, 'id'>>): Promise<User> {
+    const dto = await this.remoteDataSource.update(id, user);
+    return UserMapper.toDomain(dto);
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.remoteDataSource.delete(id);
+  }
 }

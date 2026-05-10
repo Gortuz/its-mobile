@@ -44,4 +44,32 @@ export class UserRemoteDataSource {
 
     return unwrap<UserDto>(response.data);
   }
+
+  async create(user: Omit<UserDto, 'id'>): Promise<UserDto> {
+    const response = await apiClient.post<ApiResponseDto<UserDto> | UserDto>('/users', user);
+
+    if (__DEV__) {
+      console.log('[UserRemoteDataSource] POST /users →', JSON.stringify(response.data, null, 2));
+    }
+
+    return unwrap<UserDto>(response.data);
+  }
+
+  async update(id: string, user: Partial<Omit<UserDto, 'id'>>): Promise<UserDto> {
+    const response = await apiClient.patch<ApiResponseDto<UserDto> | UserDto>(`/users/${id}`, user);
+
+    if (__DEV__) {
+      console.log(`[UserRemoteDataSource] PATCH /users/${id} →`, JSON.stringify(response.data, null, 2));
+    }
+
+    return unwrap<UserDto>(response.data);
+  }
+
+  async delete(id: string): Promise<void> {
+    await apiClient.delete(`/users/${id}`);
+
+    if (__DEV__) {
+      console.log(`[UserRemoteDataSource] DELETE /users/${id} → success`);
+    }
+  }
 }
