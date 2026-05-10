@@ -56,10 +56,10 @@ export class UserRemoteDataSource {
   }
 
   async update(id: string, user: Partial<Omit<UserDto, 'id'>>): Promise<UserDto> {
-    const response = await apiClient.patch<ApiResponseDto<UserDto> | UserDto>(`/users/${id}`, user);
+    const response = await apiClient.put<ApiResponseDto<UserDto> | UserDto>(`/users/${id}`, user);
 
     if (__DEV__) {
-      console.log(`[UserRemoteDataSource] PATCH /users/${id} →`, JSON.stringify(response.data, null, 2));
+      console.log(`[UserRemoteDataSource] PUT /users/${id} →`, JSON.stringify(response.data, null, 2));
     }
 
     return unwrap<UserDto>(response.data);

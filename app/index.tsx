@@ -11,74 +11,131 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
+  Switch,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '@src/presentation/hooks/useUsers';
 import type { User } from '@src/domain/entities/User';
 
 export default function UsersScreen() {
-  const { data: users, isLoading, isError, error, refetch } = useUsers();
+  const { data: users, isLoading, isFetching, isError, error, refetch } = useUsers();
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
   const deleteUser = useDeleteUser();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isActive, setIsActive] = useState(true);
 
   const handleOpenModal = (user?: User) => {
     if (user) {
       setEditingUser(user);
-      setName(user.name || '');
+      setFirstName(user.firstName || '');
+      setLastName(user.lastName || '');
       setEmail(user.email || '');
+      setPassword('');
+      setConfirmPassword('');
+      setIsActive(user.isActive ?? true);
     } else {
       setEditingUser(null);
-      setName('');
+      setFirstName('');
+      setLastName('');
       setEmail('');
+      setPassword('');
+      setConfirmPassword('');
+      setIsActive(true);
     }
     setModalVisible(true);
   };
 
   const handleSave = () => {
-    if (!name || !email) {
-      Alert.alert('Error', 'Please fill all fields');
+    if (!firstName || !lastName || !email) {
+      Alert.alert('Error', 'Please fill all required fields');
       return;
+    }
+
+    if (!editingUser && !password) {
+      Alert.alert('Error', 'Password is required for new users');
+      return;
+    }
+
+    if (password && password !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match');
+      return;
+    }
+
+    if (password && password.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters long');
+      return;
+    }
+
+    const userData: any = {
+      firstName,
+      lastName,
+      email,
+      isActive,
+    };
+
+    if (password) {
+      userData.password = password;
     }
 
     if (editingUser) {
       updateUser.mutate(
-        { id: editingUser.id, user: { name, email } },
+        { id: editingUser.id, user: userData },
         {
           onSuccess: () => {
             setModalVisible(false);
+            Alert.alert('Success', 'Person updated successfully');
           },
+          onError: (err) => {
+            Alert.alert('Error', err.message || 'Failed to update person');
+          }
         }
       );
     } else {
       createUser.mutate(
-        { name, email, role: 'User' },
+        { ...userData, role: 'User' },
         {
           onSuccess: () => {
             setModalVisible(false);
+            Alert.alert('Success', 'Person created successfully');
           },
+          onError: (err) => {
+            Alert.alert('Error', err.message || 'Failed to create person');
+          }
         }
       );
     }
   };
 
   const handleDelete = (id: string) => {
-    Alert.alert('Delete User', 'Are you sure you want to delete this user?', [
+    Alert.alert('Delete Person', 'Are you sure you want to delete this person?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: () => deleteUser.mutate(id),
+        onPress: () => {
+          deleteUser.mutate(id, {
+            onSuccess: () => {
+              Alert.alert('Success', 'Person deleted successfully');
+            },
+            onError: (err) => {
+              Alert.alert('Error', err.message || 'Failed to delete person');
+            }
+          });
+        },
       },
     ]);
   };
 
-  if (isLoading) {
+  if (isLoading && !users) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#0ea5e9" />
@@ -107,16 +164,28 @@ export default function UsersScreen() {
           <View style={styles.card}>
             <View style={styles.cardContent}>
               <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{item.name ? item.name.charAt(0) : '?'}</Text>
+                <Text style={styles.avatarText}>
+                  {item.firstName ? item.firstName.charAt(0) : '?'}
+                </Text>
               </View>
               <View style={styles.info}>
-                <Text style={styles.userName}>{item.name || 'Anonymous'}</Text>
-                <Text style={styles.userEmail}>{item.email || 'No email'}</Text>
+                <View style={styles.nameRow}>
+                  <Text style={styles.userName}>
+                    {item.firstName} {item.lastName}
+                  </Text>
+                  <View
+                    style={[
+                      styles.statusIndicator,
+                      { backgroundColor: item.isActive ? '#10b981' : '#ef4444' },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.userEmail}>{item.email}</Text>
               </View>
             </View>
             <View style={styles.actions}>
               <TouchableOpacity style={styles.actionButton} onPress={() => handleOpenModal(item)}>
-                <Text style={styles.editLabel}>Edit</Text>
+                <Text style={styles.editLabel}>Edit / Change Pass</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.actionButton} onPress={() => handleDelete(item.id)}>
                 <Text style={styles.deleteLabel}>Delete</Text>
@@ -126,11 +195,21 @@ export default function UsersScreen() {
         )}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No users found.</Text>
+            <Text style={styles.emptyText}>No people found.</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={() => refetch()}>
+              <Text style={styles.retryButtonText}>Refresh</Text>
+            </TouchableOpacity>
           </View>
         }
-        refreshing={isLoading}
-        onRefresh={refetch}
+        refreshControl={
+          <RefreshControl
+            refreshing={isFetching}
+            onRefresh={refetch}
+            tintColor="#f8f0f0ff"
+            colors={['#f8f8f8ff']}
+            progressViewOffset={10}
+          />
+        }
       />
 
       <Modal visible={modalVisible} animationType="slide" transparent>
@@ -140,14 +219,24 @@ export default function UsersScreen() {
         >
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>{editingUser ? 'Edit Person' : 'New Person'}</Text>
-            
-            <TextInput
-              style={styles.input}
-              placeholder="Full Name"
-              placeholderTextColor="#64748b"
-              value={name}
-              onChangeText={setName}
-            />
+
+            <View style={styles.inputRow}>
+              <TextInput
+                style={[styles.input, { flex: 1, marginRight: 8 }]}
+                placeholder="First Name"
+                placeholderTextColor="#64748b"
+                value={firstName}
+                onChangeText={setFirstName}
+              />
+              <TextInput
+                style={[styles.input, { flex: 1, marginLeft: 8 }]}
+                placeholder="Last Name"
+                placeholderTextColor="#64748b"
+                value={lastName}
+                onChangeText={setLastName}
+              />
+            </View>
+
             <TextInput
               style={styles.input}
               placeholder="Email Address"
@@ -157,6 +246,40 @@ export default function UsersScreen() {
               value={email}
               onChangeText={setEmail}
             />
+
+            <View style={styles.passwordSection}>
+              <Text style={styles.sectionLabel}>
+                {editingUser ? 'Change Password (optional)' : 'Security'}
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder="New Password"
+                placeholderTextColor="#64748b"
+                secureTextEntry
+                value={password}
+                onChangeText={setPassword}
+              />
+              {password.length > 0 && (
+                <TextInput
+                  style={styles.input}
+                  placeholder="Confirm New Password"
+                  placeholderTextColor="#64748b"
+                  secureTextEntry
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                />
+              )}
+            </View>
+
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>Active Account</Text>
+              <Switch
+                value={isActive}
+                onValueChange={setIsActive}
+                trackColor={{ false: '#334155', true: '#0ea5e9' }}
+                thumbColor={isActive ? '#fff' : '#94a3b8'}
+              />
+            </View>
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
@@ -195,7 +318,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 24,
     paddingVertical: 20,
-    marginTop: Platform.OS === 'android' ? 30 : 0,
   },
   title: {
     fontSize: 32,
@@ -207,6 +329,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#94a3b8',
     marginTop: 2,
+  },
+  refreshIndicatorContainer: {
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  refreshBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1e293b',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#334155',
   },
   addButton: {
     backgroundColor: '#0ea5e9',
@@ -256,6 +393,16 @@ const styles = StyleSheet.create({
   },
   info: {
     flex: 1,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   userName: {
     fontSize: 17,
@@ -309,6 +456,14 @@ const styles = StyleSheet.create({
   emptyText: {
     color: '#64748b',
     fontSize: 16,
+    marginBottom: 16,
+  },
+  retryButton: {
+    padding: 8,
+  },
+  retryButtonText: {
+    color: '#0ea5e9',
+    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,
@@ -328,6 +483,10 @@ const styles = StyleSheet.create({
     color: '#f8fafc',
     marginBottom: 24,
   },
+  inputRow: {
+    flexDirection: 'row',
+    marginBottom: 0,
+  },
   input: {
     backgroundColor: '#0f172a',
     borderRadius: 16,
@@ -338,10 +497,35 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#334155',
   },
+  passwordSection: {
+    marginBottom: 16,
+  },
+  sectionLabel: {
+    color: '#94a3b8',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+    marginLeft: 4,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#0f172a',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  switchLabel: {
+    color: '#f8fafc',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   modalButtons: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 8,
   },
   modalButton: {
     flex: 1,

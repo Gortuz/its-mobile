@@ -6,9 +6,12 @@ import type { User } from '@src/domain/entities/User';
  */
 export interface UserDto {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
-  role: string;
+  password?: string;
+  isActive: boolean;
+  role?: string;
 }
 
 /**
@@ -25,8 +28,11 @@ export class UserMapper {
   static toDomain(dto: UserDto): User {
     return {
       id: dto.id,
-      name: dto.name,
+      firstName: dto.firstName,
+      lastName: dto.lastName,
       email: dto.email,
+      password: dto.password,
+      isActive: dto.isActive,
       role: dto.role,
     };
   }
